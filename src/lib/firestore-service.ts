@@ -27,6 +27,7 @@ import {
 } from 'firebase/firestore';
 import type { Project, Folder, Asset, Company, MockStoredUser, AuthenticatedUser, UserRole } from '@/data/mock-data';
 import { mockCompanies as initialMockCompanies } from '@/data/mock-data';
+import { uploadMedia } from '@/actions/cloudinary-actions';
 
 const COMPANIES_COLLECTION = 'companies';
 const PROJECTS_COLLECTION = 'projects';
@@ -574,18 +575,37 @@ export async function getAssetById(assetId: string): Promise<Asset | null> {
 
 export async function addAsset(assetData: Omit<Asset, 'id' | 'createdAt' | 'updatedAt' | 'name_lowercase' | 'name_lowercase_with_status'>, localId?: string): Promise<Asset | null> {
   try {
-    const dataWithNullForOptionalAudio = {
-      ...assetData,
-      recordedAudioDataUrl: assetData.recordedAudioDataUrl || null,
-    };
+    // Handle media uploads first
+    const uploadedPhotoUrls = await Promise.all(
+        (assetData.photos || []).map(photo => {
+            if (photo.startsWith('data:image')) {
+                return uploadMedia(photo).then(res => res.success ? res.url : photo);
+            }
+            return Promise.resolve(photo);
+        })
+    );
+     const uploadedVideoUrls = await Promise.all(
+        (assetData.videos || []).map(video => {
+            if (video.startsWith('data:video')) {
+                 // Assuming uploadMedia can handle videos or a similar function exists
+                return uploadMedia(video).then(res => res.success ? res.url : video);
+            }
+            return Promise.resolve(video);
+        })
+    );
 
-    const dataToSave = removeUndefinedProps({
-      ...dataWithNullForOptionalAudio,
-      name_lowercase: assetData.name.toLowerCase(),
-      isDone: false, // Explicitly set to false for new assets
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
+    const assetDataForDb = {
+        ...assetData,
+        photos: uploadedPhotoUrls.filter((url): url is string => !!url),
+        videos: uploadedVideoUrls.filter((url): url is string => !!url),
+        recordedAudioDataUrl: assetData.recordedAudioDataUrl || null,
+        name_lowercase: assetData.name.toLowerCase(),
+        isDone: false, // Explicitly set to false for new assets
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+    };
+    
+    const dataToSave = removeUndefinedProps(assetDataForDb);
 
     let docRef;
     if (localId) {
@@ -856,4 +876,3 @@ export async function searchAssets(
     return { assets: [], lastDoc: null };
   }
 }
-
