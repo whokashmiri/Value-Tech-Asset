@@ -711,10 +711,12 @@ export default function NewAssetPage() {
     setIsProcessingMedia(true);
     
     try {
-        const compressionPromises = capturedPhotosInSession.map(async (photoDataUrl) => {
-           return compressImage(await (await fetch(photoDataUrl)).blob() as File);
-        });
-        const finalPhotoUrls = await Promise.all(compressionPromises);
+      const photoBlobs = await Promise.all(
+        capturedPhotosInSession.map(dataUrl => fetch(dataUrl).then(res => res.blob()))
+      );
+
+      const compressionPromises = photoBlobs.map(blob => compressImage(blob as File));
+      const finalPhotoUrls = await Promise.all(compressionPromises);
       
       setPhotoUrls(prev => [...prev, ...finalPhotoUrls]);
       setVideoUrls(prev => [...prev, ...capturedVideosInSession]);

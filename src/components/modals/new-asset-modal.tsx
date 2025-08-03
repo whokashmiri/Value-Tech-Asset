@@ -676,11 +676,13 @@ export function NewAssetModal({ isOpen, onClose, project, parentFolder, onAssetC
     setIsProcessingMedia(true);
     
     try {
-        const photoCompressionPromises = capturedPhotosInSession.map(photoDataUrl =>
-            fetch(photoDataUrl).then(res => res.blob()).then(blob => compressImage(blob as File))
+        const photoBlobs = await Promise.all(
+          capturedPhotosInSession.map(dataUrl => fetch(dataUrl).then(res => res.blob()))
         );
+
+        const compressionPromises = photoBlobs.map(blob => compressImage(blob as File));
         
-        const compressedPhotos = await Promise.all(photoCompressionPromises);
+        const compressedPhotos = await Promise.all(compressionPromises);
 
         setPhotoPreviews(prev => [...prev, ...compressedPhotos]);
         setVideoPreviews(prev => [...prev, ...capturedVideosInSession]);
