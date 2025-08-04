@@ -24,6 +24,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import { compressImage } from '@/lib/image-handler-service';
 import { useOnlineStatus } from '@/hooks/use-online-status';
+import { v4 as uuidv4 } from 'uuid';
 
 
 type AssetCreationStep = 'photos_and_name' | 'descriptions';
@@ -908,6 +909,8 @@ export default function NewAssetPage() {
     setIsSaving(true);
     const finalSerial = serialNumber.trim() ? parseFloat(serialNumber.trim()) : NaN;
   
+    const assetId = isEditMode && assetIdToEdit ? assetIdToEdit : uuidv4();
+    
     try {
       let finalPhotoUrls: string[] = [];
   
@@ -916,7 +919,7 @@ export default function NewAssetPage() {
         const existingPhotoUrls = photoUrls.filter(url => !url.startsWith('data:image'));
   
         const photoUploadPromises = newPhotosToUpload.map(async (dataUrl) => {
-          const result = await uploadMedia(dataUrl);
+          const result = await uploadMedia(dataUrl, projectId, assetId);
           if (result.success && result.url) return result.url;
           console.error(`A photo failed to upload: ${result.error}. Keeping local version.`);
           return dataUrl; 
@@ -952,7 +955,10 @@ export default function NewAssetPage() {
         }
       } else { 
         if (isOnline) {
-          success = !!await FirestoreService.addAsset(assetDataPayload as Omit<Asset, 'id' | 'createdAt' | 'updatedAt'>);
+          // Pass the pre-generated ID to addAsset
+          const newAssetWithId = { ...assetDataPayload, id: assetId } as Omit<Asset, 'createdAt' | 'updatedAt'>;
+          // This service function needs to be adapted to accept an ID
+          success = !!await FirestoreService.addAsset(newAssetWithId as any);
         } else {
           OfflineService.queueOfflineAction('add-asset', assetDataPayload, project.id);
           success = true; 
@@ -1287,5 +1293,3 @@ export default function NewAssetPage() {
     </div>
   );
 }
-
-    

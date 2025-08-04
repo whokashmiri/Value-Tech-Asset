@@ -2,6 +2,7 @@
 'use server';
 
 import { v2 as cloudinary } from 'cloudinary';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * @fileOverview Server Action for handling media uploads to Cloudinary.
@@ -31,9 +32,11 @@ cloudinary.config({
  * It is restricted to image resource types.
  * 
  * @param fileDataUrl The file to upload, as a base64 Data URI.
+ * @param projectId The ID of the project the asset belongs to.
+ * @param assetId The ID of the asset this media belongs to.
  * @returns A promise that resolves to an object with success status and either the URL or an error message.
  */
-export async function uploadMedia(fileDataUrl: string): Promise<UploadResponse> {
+export async function uploadMedia(fileDataUrl: string, projectId: string, assetId: string): Promise<UploadResponse> {
   if (!process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET || !process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME) {
     console.error('Cloudinary environment variables are not configured.');
     return { success: false, error: 'Cloudinary environment variables are not configured. Cannot upload media.' };
@@ -41,20 +44,25 @@ export async function uploadMedia(fileDataUrl: string): Promise<UploadResponse> 
   
   // Detect MIME type from data URL
   const mimeType = fileDataUrl.substring(fileDataUrl.indexOf(':') + 1, fileDataUrl.indexOf(';'));
-  if (!mimeType.startsWith('image/')) {
-    const errorMsg = 'Invalid file type. Only images can be uploaded to Cloudinary.';
-    console.error(errorMsg);
-    return { success: false, error: errorMsg };
+  
+  const resourceType = mimeType.startsWith('image/') ? 'image' : mimeType.startsWith('video/') ? 'video' : 'raw';
+  
+  if (resourceType === 'raw') {
+     const errorMsg = `Invalid file type: ${mimeType}. Only images and videos can be uploaded.`;
+     console.error(errorMsg);
+     return { success: false, error: errorMsg };
   }
 
   try {
     const result = await cloudinary.uploader.upload(fileDataUrl, {
-      resource_type: "image", // Explicitly set to image
+      resource_type: resourceType,
+      folder: `${projectId}/${assetId}`, // Use projectId and assetId to create a folder path
+      public_id: uuidv4(), // Generate a unique public_id for the file
     });
     console.log('Cloudinary upload successful. URL:', result.secure_url);
     return { success: true, url: result.secure_url };
   } catch (error: any) {
     console.error("Cloudinary Upload Error:", error);
-    return { success: false, error: error?.message || 'Failed to upload image to Cloudinary.' };
+    return { success: false, error: error?.message || 'Failed to upload media to Cloudinary.' };
   }
 }

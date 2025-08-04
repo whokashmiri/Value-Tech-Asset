@@ -28,6 +28,7 @@ import {
 import type { Project, Folder, Asset, Company, MockStoredUser, AuthenticatedUser, UserRole } from '@/data/mock-data';
 import { mockCompanies as initialMockCompanies } from '@/data/mock-data';
 import { uploadMedia } from '@/actions/cloudinary-actions';
+import { v4 as uuidv4 } from 'uuid';
 
 const COMPANIES_COLLECTION = 'companies';
 const PROJECTS_COLLECTION = 'projects';
@@ -573,22 +574,24 @@ export async function getAssetById(assetId: string): Promise<Asset | null> {
     }
 }
 
-export async function addAsset(assetData: Omit<Asset, 'id' | 'createdAt' | 'updatedAt' | 'name_lowercase' | 'name_lowercase_with_status'>, localId?: string): Promise<Asset | null> {
+export async function addAsset(assetData: Omit<Asset, 'id' | 'createdAt' | 'updatedAt' | 'name_lowercase' | 'name_lowercase_with_status'>): Promise<Asset | null> {
+  const newAssetId = uuidv4(); // Generate a unique ID for the asset upfront.
   try {
-    // Handle media uploads first
-    const uploadedPhotoUrls = await Promise.all(
-        (assetData.photos || []).map(photo => {
-            if (photo.startsWith('data:image')) {
-                return uploadMedia(photo).then(res => res.success ? res.url : photo);
-            }
-            return Promise.resolve(photo);
-        })
-    );
+    // Handle media uploads first, passing the new assetId for folder creation
+    const uploadPromises = (assetData.photos || []).map(photo => {
+      if (photo.startsWith('data:image')) {
+        return uploadMedia(photo, assetData.projectId, newAssetId).then(res => res.success ? res.url : photo);
+      }
+      return Promise.resolve(photo);
+    });
+    
+    const uploadedPhotoUrls = await Promise.all(uploadPromises);
+
      const uploadedVideoUrls = await Promise.all(
         (assetData.videos || []).map(video => {
             if (video.startsWith('data:video')) {
                  // Assuming uploadMedia can handle videos or a similar function exists
-                return uploadMedia(video).then(res => res.success ? res.url : video);
+                return uploadMedia(video, assetData.projectId, newAssetId).then(res => res.success ? res.url : video);
             }
             return Promise.resolve(video);
         })
@@ -606,14 +609,11 @@ export async function addAsset(assetData: Omit<Asset, 'id' | 'createdAt' | 'upda
     };
     
     const dataToSave = removeUndefinedProps(assetDataForDb);
-
-    let docRef;
-    if (localId) {
-        docRef = doc(getDb(), ASSETS_COLLECTION, localId);
-        await setDoc(docRef, dataToSave);
-    } else {
-        docRef = await addDoc(collection(getDb(), ASSETS_COLLECTION), dataToSave);
-    }
+    
+    // Use the generated ID to create the document reference
+    const docRef = doc(getDb(), ASSETS_COLLECTION, newAssetId);
+    await setDoc(docRef, dataToSave);
+    
     const newAssetDoc = await getDoc(docRef);
     if (newAssetDoc.exists()) {
         return processDoc<Asset>(newAssetDoc);
@@ -626,6 +626,12 @@ export async function addAsset(assetData: Omit<Asset, 'id' | 'createdAt' | 'upda
 }
 
 export async function updateAsset(assetId: string, assetData: Partial<Asset>): Promise<boolean> {
+  const originalAsset = await getAssetById(assetId);
+  if (!originalAsset) {
+      console.error("Original asset not found for update");
+      return false;
+  }
+  
   try {
     const docRef = doc(getDb(), ASSETS_COLLECTION, assetId);
 
@@ -636,6 +642,28 @@ export async function updateAsset(assetId: string, assetData: Partial<Asset>): P
     
     if (assetData.name) {
         dataToUpdate.name_lowercase = assetData.name.toLowerCase();
+    }
+
+    if (assetData.photos) {
+      dataToUpdate.photos = await Promise.all(
+        (assetData.photos || []).map(async (photo) => {
+          if (photo.startsWith('data:image')) {
+            return uploadMedia(photo, originalAsset.projectId, assetId).then(res => res.success ? res.url : photo);
+          }
+          return photo;
+        })
+      );
+    }
+    
+    if (assetData.videos) {
+       dataToUpdate.videos = await Promise.all(
+         (assetData.videos || []).map(async (video) => {
+            if (video.startsWith('data:video')) {
+              return uploadMedia(video, originalAsset.projectId, assetId).then(res => res.success ? res.url : video);
+            }
+            return video;
+         })
+       );
     }
 
     await updateDoc(docRef, removeUndefinedProps(dataToUpdate));

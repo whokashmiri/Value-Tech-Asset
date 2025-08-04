@@ -1,4 +1,5 @@
 
+
 "use client";
 import React, { useEffect, useState, useCallback, useMemo, useDeferredValue, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
@@ -807,13 +808,14 @@ export default function ProjectPage() {
             // If there are images, the folder becomes an asset
             setIsProcessingDrop(true);
             setLoadingAssetId(`drop_${entry.fullPath}`);
+            const newAssetId = uuidv4();
             try {
                 const getFilePromise = (fileEntry: FileSystemFileEntry): Promise<File> => new Promise((resolve) => fileEntry.file(resolve));
                 const files = await Promise.all(imageFiles.map(getFilePromise));
                 
                 const uploadPromises = files.map(async (file) => {
                     const compressedDataUrl = await compressImage(file);
-                    return await uploadMedia(compressedDataUrl);
+                    return await uploadMedia(compressedDataUrl, project.id, newAssetId);
                 });
     
                 const uploadResults = await Promise.all(uploadPromises);
@@ -827,8 +829,9 @@ export default function ProjectPage() {
                         userId: currentUser.id,
                         photos: uploadedUrls,
                         videos: [],
+                        id: newAssetId
                     };
-                    await FirestoreService.addAsset(assetPayload);
+                    await FirestoreService.addAsset(assetPayload as any);
                 } else {
                      toast({title: "Upload Error", description: `No images could be uploaded for ${entry.name}`, variant: 'destructive'});
                 }
@@ -896,7 +899,7 @@ export default function ProjectPage() {
 
       const uploadPromises = imageFiles.map(async file => {
         const compressedDataUrl = await compressImage(file);
-        return await uploadMedia(compressedDataUrl);
+        return await uploadMedia(compressedDataUrl, targetAsset.projectId, targetAsset.id);
       });
 
       
@@ -938,7 +941,7 @@ export default function ProjectPage() {
 
       const uploadPromises = imageFiles.map(async file => {
         const compressedDataUrl = await compressImage(file);
-        return await uploadMedia(compressedDataUrl);
+        return await uploadMedia(compressedDataUrl, assetToPreview.projectId, assetToPreview.id);
       });
 
       const uploadResults = await Promise.all(uploadPromises);
