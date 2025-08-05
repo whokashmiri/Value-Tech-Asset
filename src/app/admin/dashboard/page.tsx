@@ -231,7 +231,7 @@ export default function AdminDashboardPage() {
         description: `Preparing to export "${project.name}"...`,
     });
 
-    const MAX_CELL_LENGTH = 32700; // A bit less than 32767 for safety
+    const MAX_CELL_LENGTH = 32700;
     const truncateCell = (text: string | undefined | null): string => {
         if (!text) return '';
         if (text.length > MAX_CELL_LENGTH) {
@@ -243,7 +243,7 @@ export default function AdminDashboardPage() {
     try {
         const [folders, assets] = await Promise.all([
             FirestoreService.getFolders(project.id),
-            FirestoreService.getAllAssetsForProject(project.id),
+            FirestoreService.getAllAssetsForProject(project.id, 'all'),
         ]);
 
         const assetsByFolder = new Map<string | null, Asset[]>();
@@ -267,6 +267,7 @@ export default function AdminDashboardPage() {
                 const rowData: { [key: string]: any } = {
                     'Name': asset.name,
                     'Serial Number': asset.serialNumber || '',
+                    'Progress': asset.isDone ? 'Completed' : 'Incomplete',
                     'Text Description': truncateCell(asset.textDescription),
                     'Voice Description (Transcript)': truncateCell(asset.voiceDescription),
                     'Videos': truncateCell((asset.videos || []).join(', ')),
@@ -274,7 +275,6 @@ export default function AdminDashboardPage() {
                     ...miscellaneousData,
                 };
                 
-                // Add each photo URL in its own column
                 (asset.photos || []).forEach((photoUrl, index) => {
                     const photoColumnName = `Photo ${index + 1}`;
                     rowData[photoColumnName] = { 
@@ -300,6 +300,7 @@ export default function AdminDashboardPage() {
             const baseColWidths = [
                 { wch: 30 }, // Name
                 { wch: 20 }, // Serial Number
+                { wch: 15 }, // Progress
                 { wch: 40 }, // Text Description
                 { wch: 40 }, // Voice Description
                 { wch: 20 }, // Videos
@@ -307,7 +308,7 @@ export default function AdminDashboardPage() {
             ];
 
             const miscKeys = Object.keys(sheetData[0]).filter(key => ![
-                'Name', 'Serial Number', 'Text Description', 'Voice Description (Transcript)', 'Videos', 'Created At'
+                'Name', 'Serial Number', 'Progress', 'Text Description', 'Voice Description (Transcript)', 'Videos', 'Created At'
             ].includes(key) && !key.startsWith('Photo '));
 
             const miscColWidths = miscKeys.map(() => ({ wch: 20 }));
@@ -674,6 +675,8 @@ export default function AdminDashboardPage() {
     </div>
   );
 }
+
+    
 
     
 
