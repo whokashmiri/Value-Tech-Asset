@@ -72,8 +72,8 @@ export interface MockStoredUser extends AuthenticatedUser {
 }
 
 export const mockCompanies: Company[] = [
-  { id: 'comp1', name: 'INNOVATECH SOLUTIONS' },
-  { id: 'comp2', name: 'FUTUREBUILD CORP' },
+  { id: 'comp1', name: 'GOEXALT SYSTEMS' },
+  { id: 'comp2', name: 'FUTURE INTELLIGENCE' },
   { id: 'comp3', name: 'ECOCONSTRUCT LTD.' },
 ];
 
