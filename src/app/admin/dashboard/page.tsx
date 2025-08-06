@@ -257,31 +257,17 @@ export default function AdminDashboardPage() {
 
         const zip = new JSZip();
         const folderMap = new Map(folders.map(f => [f.id, f.name]));
-        const cloudinaryCloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
-
+        
         for (const [folderId, folderAssets] of assetsByFolder.entries()) {
             if (folderAssets.length === 0) continue;
 
             const sheetData = folderAssets.map(asset => {
                 const miscellaneousData = asset.miscellaneous ? { ...asset.miscellaneous } : {};
                 
-                const assetFolderPath = `${project.id}/${asset.id}`;
-                const cloudinaryFolderUrl = cloudinaryCloudName 
-                  ? `https://cloudinary.com/console/media_library/folders/${cloudinaryCloudName}/${encodeURIComponent(assetFolderPath)}`
-                  : '';
-
                 const rowData: { [key: string]: any } = {
                     'Name': asset.name,
                     'Serial Number': asset.serialNumber || '',
                     'Progress': asset.isDone ? 'Completed' : 'Incomplete',
-                    'Asset Folder': cloudinaryFolderUrl ? {
-                        t: 's',
-                        v: 'View Asset Media',
-                        l: {
-                            Target: cloudinaryFolderUrl,
-                            Tooltip: `View all media for ${asset.name} in Cloudinary`
-                        }
-                    } : 'Not available',
                     'Text Description': truncateCell(asset.textDescription),
                     'Voice Description (Transcript)': truncateCell(asset.voiceDescription),
                     'Videos': truncateCell((asset.videos || []).join(', ')),
@@ -315,7 +301,6 @@ export default function AdminDashboardPage() {
                 { wch: 30 }, // Name
                 { wch: 20 }, // Serial Number
                 { wch: 15 }, // Progress
-                { wch: 25 }, // Asset Folder
                 { wch: 40 }, // Text Description
                 { wch: 40 }, // Voice Description
                 { wch: 20 }, // Videos
@@ -323,7 +308,7 @@ export default function AdminDashboardPage() {
             ];
 
             const miscKeys = Object.keys(sheetData[0]).filter(key => ![
-                'Name', 'Serial Number', 'Progress', 'Asset Folder', 'Text Description', 'Voice Description (Transcript)', 'Videos', 'Created At'
+                'Name', 'Serial Number', 'Progress', 'Text Description', 'Voice Description (Transcript)', 'Videos', 'Created At'
             ].includes(key) && !key.startsWith('Photo '));
 
             const miscColWidths = miscKeys.map(() => ({ wch: 20 }));
@@ -690,6 +675,8 @@ export default function AdminDashboardPage() {
     </div>
   );
 }
+
+    
 
     
 
