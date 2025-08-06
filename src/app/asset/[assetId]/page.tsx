@@ -1,14 +1,19 @@
 
 "use client";
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import * as FirestoreService from '@/lib/firestore-service';
 import type { Asset } from '@/data/mock-data';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, CameraOff } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Loader2, CameraOff, ArrowLeft, ArrowRight } from 'lucide-react';
 import Image from 'next/image';
 import { useLanguage } from '@/contexts/language-context';
+
+type MediaItem = {
+  type: 'image' | 'video';
+  url: string;
+};
 
 export default function AssetViewerPage() {
     const params = useParams();
@@ -18,6 +23,43 @@ export default function AssetViewerPage() {
     const [asset, setAsset] = useState<Asset | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
+
+    const mediaItems: MediaItem[] = useMemo(() => {
+      if (!asset) return [];
+      const photos = (asset.photos || []).map(url => ({ type: 'image' as const, url }));
+      const videos = (asset.videos || []).map(url => ({ type: 'video' as const, url }));
+      return [...photos, ...videos];
+    }, [asset]);
+
+    const handleNextMedia = useCallback(() => {
+      if (mediaItems.length > 1) {
+        setCurrentMediaIndex((prevIndex) => (prevIndex + 1) % mediaItems.length);
+      }
+    }, [mediaItems.length]);
+  
+    const handlePrevMedia = useCallback(() => {
+      if (mediaItems.length > 1) {
+        setCurrentMediaIndex((prevIndex) => (prevIndex - 1 + mediaItems.length) % mediaItems.length);
+      }
+    }, [mediaItems.length]);
+
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+          if (event.key === 'ArrowRight') {
+            handleNextMedia();
+          } else if (event.key === 'ArrowLeft') {
+            handlePrevMedia();
+          }
+        };
+    
+        window.addEventListener('keydown', handleKeyDown);
+    
+        return () => {
+          window.removeEventListener('keydown', handleKeyDown);
+        };
+      }, [handleNextMedia, handlePrevMedia]);
+
 
     useEffect(() => {
         if (assetId) {
@@ -64,11 +106,8 @@ export default function AssetViewerPage() {
     if (!asset) {
         return null; // Should be covered by error state, but as a fallback.
     }
-
-    const allMedia = [
-        ...(asset.photos || []).map(url => ({ type: 'image', url })),
-        ...(asset.videos || []).map(url => ({ type: 'video', url }))
-    ];
+    
+    const currentMedia = mediaItems.length > 0 ? mediaItems[currentMediaIndex] : null;
 
     return (
         <div className="min-h-screen bg-background text-foreground p-4 sm:p-6 md:p-8">
@@ -86,36 +125,49 @@ export default function AssetViewerPage() {
                         )}
                     </CardHeader>
                     <CardContent>
-                        {allMedia.length > 0 ? (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                                {allMedia.map((media, index) => (
-                                    <a 
-                                        key={index}
-                                        href={media.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="group block relative aspect-square w-full h-full rounded-lg overflow-hidden border shadow-md hover:shadow-xl transition-shadow"
+                        {currentMedia ? (
+                             <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-muted border shadow-inner group">
+                                {currentMedia.type === 'image' ? (
+                                    <Image
+                                        key={currentMedia.url}
+                                        src={currentMedia.url}
+                                        alt={t('assetPhotoAlt', `Photo of ${asset.name}`, { assetName: asset.name })}
+                                        fill
+                                        className="object-contain"
+                                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                                    />
+                                ) : (
+                                    <video
+                                        key={currentMedia.url}
+                                        src={currentMedia.url}
+                                        controls
+                                        autoPlay
+                                        className="w-full h-full object-contain bg-black"
+                                    />
+                                )}
+                                {mediaItems.length > 1 && (
+                                <>
+                                    <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="absolute left-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-black/30 text-white hover:bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100"
+                                    onClick={(e) => { e.stopPropagation(); handlePrevMedia(); }}
                                     >
-                                        {media.type === 'image' ? (
-                                            <Image
-                                                src={media.url}
-                                                alt={`Asset media ${index + 1}`}
-                                                fill
-                                                className="object-cover transition-transform duration-300 group-hover:scale-105"
-                                                sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                                            />
-                                        ) : (
-                                            <video
-                                                src={media.url}
-                                                controls={false}
-                                                className="w-full h-full object-cover"
-                                            />
-                                        )}
-                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                            <p className="text-white text-sm font-semibold">View Full Size</p>
-                                        </div>
-                                    </a>
-                                ))}
+                                    <ArrowLeft className="h-6 w-6" />
+                                    </Button>
+                                    <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 rounded-full bg-black/30 text-white hover:bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100"
+                                    onClick={(e) => { e.stopPropagation(); handleNextMedia(); }}
+                                    >
+                                    <ArrowRight className="h-6 w-6" />
+                                    </Button>
+                                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/50 text-white text-xs font-medium rounded-full px-2.5 py-1 pointer-events-none">
+                                    {currentMediaIndex + 1} / {mediaItems.length}
+                                    </div>
+                                </>
+                                )}
                             </div>
                         ) : (
                             <div className="flex flex-col items-center justify-center h-64 rounded-lg border-2 border-dashed bg-muted text-muted-foreground">
