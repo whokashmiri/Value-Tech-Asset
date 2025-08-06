@@ -263,6 +263,8 @@ export default function AdminDashboardPage() {
 
             const sheetData = folderAssets.map(asset => {
                 const miscellaneousData = asset.miscellaneous ? { ...asset.miscellaneous } : {};
+                const hasMedia = (asset.photos && asset.photos.length > 0) || (asset.videos && asset.videos.length > 0);
+                const assetViewerUrl = hasMedia ? `${window.location.origin}/asset/${asset.id}` : '';
                 
                 const rowData: { [key: string]: any } = {
                     'Name': asset.name,
@@ -270,22 +272,20 @@ export default function AdminDashboardPage() {
                     'Progress': asset.isDone ? 'Completed' : 'Incomplete',
                     'Text Description': truncateCell(asset.textDescription),
                     'Voice Description (Transcript)': truncateCell(asset.voiceDescription),
-                    'Videos': truncateCell((asset.videos || []).join(', ')),
                     'Created At': asset.createdAt ? new Date(asset.createdAt).toLocaleString() : '',
                     ...miscellaneousData,
                 };
                 
-                (asset.photos || []).forEach((photoUrl, index) => {
-                    const photoColumnName = `Photo ${index + 1}`;
-                    rowData[photoColumnName] = { 
-                        t: 's', 
-                        v: `View Image ${index + 1}`, 
-                        l: { 
-                            Target: photoUrl, 
-                            Tooltip: `Click to view image ${index + 1} for asset ${asset.name}`
-                        } 
-                    };
-                });
+                if (assetViewerUrl) {
+                  rowData['View All Media'] = {
+                    t: 's',
+                    v: 'Click to View',
+                    l: {
+                      Target: assetViewerUrl,
+                      Tooltip: `View all media for ${asset.name}`
+                    }
+                  };
+                }
 
                 return rowData;
             });
@@ -296,25 +296,23 @@ export default function AdminDashboardPage() {
             
             worksheet['!autofilter'] = { ref: XLSX.utils.encode_range(XLSX.utils.decode_range(worksheet['!ref']!)) };
             
-            const maxPhotos = Math.max(0, ...folderAssets.map(a => a.photos?.length || 0));
             const baseColWidths = [
                 { wch: 30 }, // Name
                 { wch: 20 }, // Serial Number
                 { wch: 15 }, // Progress
                 { wch: 40 }, // Text Description
                 { wch: 40 }, // Voice Description
-                { wch: 20 }, // Videos
                 { wch: 20 }, // Created At
             ];
 
             const miscKeys = Object.keys(sheetData[0]).filter(key => ![
-                'Name', 'Serial Number', 'Progress', 'Text Description', 'Voice Description (Transcript)', 'Videos', 'Created At'
-            ].includes(key) && !key.startsWith('Photo '));
-
+                'Name', 'Serial Number', 'Progress', 'Text Description', 'Voice Description (Transcript)', 'Created At', 'View All Media'
+            ].includes(key));
+            
             const miscColWidths = miscKeys.map(() => ({ wch: 20 }));
-            const photoColWidths = Array.from({ length: maxPhotos }, () => ({ wch: 20 }));
+            const mediaLinkColWidth = [{wch: 20}];
 
-            worksheet['!cols'] = [...baseColWidths, ...miscColWidths, ...photoColWidths];
+            worksheet['!cols'] = [...baseColWidths, ...miscColWidths, ...mediaLinkColWidth];
 
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, 'Assets');
