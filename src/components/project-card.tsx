@@ -202,14 +202,17 @@ export const ProjectCard = React.memo(function ProjectCard({
               </Button>
            )}
            {onDownloadProject && (
+
+            // PROJECT DOWNLOAD
               <Button
                 variant="ghost"
+                disabled={true}    // Remove this Line
                 className="w-full h-8"
                 onClick={handleDownloadClick}
                 disabled={isLoading || isDownloading}
               >
-                {/* <HardDriveDownload className="mr-2 h-4 w-4" />
-                {t('downloadProject', 'Downloadd')} */}
+                <HardDriveDownload className="mr-2 h-4 w-4" />
+                {t('downloadProject', 'Download')}
               </Button>
            )}
         </CardFooter>

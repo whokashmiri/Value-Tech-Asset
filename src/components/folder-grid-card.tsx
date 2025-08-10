@@ -170,6 +170,7 @@ export const FolderGridCard = React.memo(function FolderGridCard({
                       <Scissors className="mr-2 h-4 w-4" />
                       {t('cut', 'Cut')}
                   </DropdownMenuItem>
+                  {/* FOLDER */}
                    {/* <DropdownMenuItem onClick={handleDownload}>
                         <HardDriveDownload className="mr-2 h-4 w-4" />
                         {t('downloadProject', 'Download')}
