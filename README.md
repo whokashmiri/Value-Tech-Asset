@@ -1,5 +1,4 @@
-# ValTech - Asset Inspector Pro
-
+# ValTech 
 ValTech is a comprehensive web application designed for professional asset inspection and valuation. It provides a robust platform for companies to manage complex inspection projects, assign roles, capture detailed asset data in the field, and generate reports. The application is built with a focus on performance, offline capability, and a modern user experience.
 
 ## Key Features
