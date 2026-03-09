@@ -5,7 +5,7 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import { useRouter } from 'next/navigation';
 import type { AuthenticatedUser, MockStoredUser, UserRole } from '@/data/mock-data';
 import * as FirestoreService from '@/lib/firestore-service'; 
-import { getAuth as getFirebaseAuthSDK, type Auth } from '@/lib/firebase/config';
+import { getAuth as getFirebaseAuthSDK } from '@/lib/firebase/config';
 
 const CURRENT_USER_SESSION_KEY = 'currentUserSession';
 

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Edit, Star, Users, MoreVertical, Trash2, Download, Loader2, HardDriveDownload } from 'lucide-react';
+import { Edit, Star, Users, MoreVertical, Trash2, Download, Loader2, HardDriveDownload, CheckCircle2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,8 +27,10 @@ interface ProjectCardProps {
   onDeleteProject?: (project: Project) => void;
   onExportProject?: (project: Project) => void;
   onDownloadProject?: (project: Project) => void;
-  isLoading?: boolean; // Covers both export and download
+  onDeleteOfflineProject?: (project: Project) => void;
+  isLoading?: boolean;
   isDownloading?: boolean;
+  isOffline?: boolean; // True if this project is cached in IndexedDB
 }
 
 export const ProjectCard = React.memo(function ProjectCard({ 
@@ -40,8 +42,10 @@ export const ProjectCard = React.memo(function ProjectCard({
   onDeleteProject,
   onExportProject,
   onDownloadProject,
+  onDeleteOfflineProject,
   isLoading,
   isDownloading,
+  isOffline,
 }: ProjectCardProps) {
   const { t } = useLanguage();
   const isMobile = useIsMobile();
@@ -159,6 +163,18 @@ export const ProjectCard = React.memo(function ProjectCard({
                           {t('assignUsersButtonTitle', 'Assign Users')}
                         </DropdownMenuItem>
                       )}
+                      {isOffline && onDeleteOfflineProject && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            onClick={() => onDeleteOfflineProject(project)}
+                            className="text-orange-600 focus:text-orange-600 focus:bg-orange-50"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            {t('removeOfflineProject', 'Remove Offline Copy')}
+                          </DropdownMenuItem>
+                        </>
+                      )}
                       {onDeleteProject && (
                         <>
                           <DropdownMenuSeparator />
@@ -202,17 +218,20 @@ export const ProjectCard = React.memo(function ProjectCard({
               </Button>
            )}
            {onDownloadProject && (
-
-            // PROJECT DOWNLOAD
               <Button
                 variant="ghost"
-                disabled={true}    // Remove this Line
-                className="w-full h-8"
+                className={cn(
+                  "w-full h-8",
+                  isOffline ? "text-green-600 hover:text-green-700 hover:bg-green-50" : ""
+                )}
                 onClick={handleDownloadClick}
                 disabled={isLoading || isDownloading}
+                title={isOffline ? t('projectAlreadyDownloaded', 'Project is available offline. Click to re-download.') : t('downloadProjectOffline', 'Download for offline use')}
               >
-                <HardDriveDownload className="mr-2 h-4 w-4" />
-                {t('downloadProject', 'Download')}
+                {isOffline
+                  ? <CheckCircle2 className="mr-2 h-4 w-4" />
+                  : <HardDriveDownload className="mr-2 h-4 w-4" />}
+                {isOffline ? t('downloaded', 'Downloaded') : t('downloadProject', 'Download')}
               </Button>
            )}
         </CardFooter>

@@ -8,7 +8,7 @@ import { EditProjectModal } from '@/components/modals/edit-project-modal';
 import type { Company, Project, ProjectStatus } from '@/data/mock-data';
 import * as FirestoreService from '@/lib/firestore-service';
 import * as OfflineService from '@/lib/offline-service';
-import { FolderPlus, CheckCircle, Star, Clock, Sparkles, Loader2, ArrowLeftRight } from 'lucide-react';
+import { FolderPlus, CheckCircle, Star, Clock, Sparkles, Loader2, ArrowLeftRight, CloudOff, Cloud } from 'lucide-react';
 import { ProjectCard } from './project-card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useLanguage } from '@/contexts/language-context';
@@ -35,6 +35,9 @@ export function ProjectDashboard({ company, onSwitchCompany }: ProjectDashboardP
   const [activeTab, setActiveTab] = useState<ProjectStatus | 'favorite'>('recent');
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
   const [loadingProjectId, setLoadingProjectId] = useState<string | null>(null);
+  const [downloadingProjectId, setDownloadingProjectId] = useState<string | null>(null);
+  const [cachedProjectIds, setCachedProjectIds] = useState<Set<string>>(new Set());
+  const [isMounted, setIsMounted] = useState(false);
 
   const { t } = useLanguage();
   const { toast } = useToast();
@@ -64,6 +67,17 @@ export function ProjectDashboard({ company, onSwitchCompany }: ProjectDashboardP
   useEffect(() => {
     fetchProjectsAndCounts();
   }, [fetchProjectsAndCounts]);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // Load cached project IDs from IndexedDB on mount
+  useEffect(() => {
+    OfflineService.getOfflineCachedProjectIds().then(ids => {
+      setCachedProjectIds(ids);
+    });
+  }, []);
 
   const filteredProjects = useMemo(() => {
     if (!currentUser) return [];
@@ -141,6 +155,40 @@ export function ProjectDashboard({ company, onSwitchCompany }: ProjectDashboardP
     }
   }, [t, toast, isOnline]);
 
+  const handleDownloadProject = useCallback(async (project: ProjectWithAssetCount) => {
+    setDownloadingProjectId(project.id);
+    toast({ title: t('downloadingProject', 'Downloading...'), description: t('downloadingProjectDesc', `Saving "${project.name}" for offline use...`, { projectName: project.name }) });
+    try {
+      await OfflineService.saveProjectForOffline(project.id);
+      setCachedProjectIds(prev => new Set([...prev, project.id]));
+      toast({
+        title: t('downloadComplete', 'Download Complete'),
+        description: t('downloadCompleteDesc', `"${project.name}" is now available offline.`, { projectName: project.name }),
+        variant: 'success-yellow'
+      });
+    } catch (error) {
+      console.error("Failed to download project for offline:", error);
+      toast({ title: t('downloadFailed', 'Download Failed'), description: t('downloadFailedDesc', 'Could not save this project for offline use.'), variant: 'destructive' });
+    } finally {
+      setDownloadingProjectId(null);
+    }
+  }, [t, toast]);
+
+  const handleDeleteOfflineProject = useCallback(async (project: ProjectWithAssetCount) => {
+    try {
+      await OfflineService.removeProjectFromCache(project.id);
+      setCachedProjectIds(prev => {
+        const next = new Set(prev);
+        next.delete(project.id);
+        return next;
+      });
+      toast({ title: t('offlineCopyRemoved', 'Offline Copy Removed'), description: t('offlineCopyRemovedDesc', `"${project.name}" has been removed from offline storage.`, { projectName: project.name }) });
+    } catch (error) {
+      console.error("Failed to remove offline project:", error);
+      toast({ title: 'Error', description: 'Could not remove the offline copy.', variant: 'destructive' });
+    }
+  }, [t, toast]);
+
   const tabItems: { value: ProjectStatus | 'favorite'; labelKey: string; defaultLabel: string; icon: React.ElementType }[] = [
     { value: 'recent', labelKey: 'recent', defaultLabel: 'Recent', icon: Clock },
     { value: 'favorite', labelKey: 'favorite', defaultLabel: 'Favorite', icon: Star },
@@ -153,6 +201,10 @@ export function ProjectDashboard({ company, onSwitchCompany }: ProjectDashboardP
   const handleProjectCardClick = (projectId: string) => {
     setLoadingProjectId(projectId);
   };
+
+  if (!isMounted) {
+    return null; // Prevent hydration mismatch
+  }
 
   return (
     <div className="space-y-6 pb-20 md:pb-0">
@@ -195,6 +247,10 @@ export function ProjectDashboard({ company, onSwitchCompany }: ProjectDashboardP
                         onEditProject={handleOpenEditModal}
                         onToggleFavorite={() => handleToggleFavorite(project)}
                         isLoading={loadingProjectId === project.id}
+                        isOffline={cachedProjectIds.has(project.id)}
+                        onDownloadProject={isOnline ? () => handleDownloadProject(project) : undefined}
+                        isDownloading={downloadingProjectId === project.id}
+                        onDeleteOfflineProject={() => handleDeleteOfflineProject(project)}
                       />
                     </div>
                   ))}

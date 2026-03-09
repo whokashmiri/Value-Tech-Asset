@@ -126,53 +126,107 @@ export async function syncOfflineActions(): Promise<{syncedCount: number, errorC
             // You will need a function to add a project from the queue
             // success = await addProjectFromQueue(action.payload);
             break;
-          case 'add-folder':
-            success = !!(await addFolderToDb(action.payload, action.localId));
+          case 'add-folder': {
+            const createdFolder = await addFolderToDb(action.payload, action.localId);
+            success = !!createdFolder;
+            // Keep IndexedDB cache in sync
+            if (success && createdFolder) {
+              const isProjectCached = await isProjectOffline(action.projectId);
+              if (isProjectCached) {
+                await db.folders.put({ ...createdFolder, isCached: true });
+              }
+            }
             break;
+          }
           case 'add-asset': {
             const assetPayload = { ...action.payload };
             if (assetPayload.photos && assetPayload.photos.length > 0) {
-                const uploadPromises = assetPayload.photos.map(async (p: string) => {
+                const uploadPromises = assetPayload.photos.map(async (p: string, index: number) => {
                     if (p.startsWith('data:image')) {
-                        const result = await uploadMedia(p);
+                        const result = await uploadMedia(p, action.projectId, action.localId || `asset-${index}`);
                         return result.success ? result.url : p;
                     }
                     return p;
                 });
-                assetPayload.photos = await Promise.all(uploadPromises);
+                assetPayload.photos = (await Promise.all(uploadPromises)).filter((p): p is string => p !== undefined);
             }
-            success = !!(await addAssetToDb(assetPayload, action.localId));
+            const createdAsset = await addAssetToDb(assetPayload);
+            success = !!createdAsset;
+            // Keep IndexedDB cache in sync
+            if (success && createdAsset) {
+              const isProjectCached = await isProjectOffline(action.projectId);
+              if (isProjectCached) {
+                await db.assets.put({ ...createdAsset, isCached: true });
+              }
+            }
             break;
           }
           case 'update-asset': {
             const assetPayload = { ...action.payload };
             if (assetPayload.photos && assetPayload.photos.length > 0) {
-                const uploadPromises = assetPayload.photos.map(async (p: string) => {
+                const uploadPromises = assetPayload.photos.map(async (p: string, index: number) => {
                     if (p.startsWith('data:image')) {
-                        const result = await uploadMedia(p);
+                        const result = await uploadMedia(p, action.projectId, action.assetId || `asset-${index}`);
                         return result.success ? result.url : p;
                     }
                     return p;
                 });
-                assetPayload.photos = await Promise.all(uploadPromises);
+                assetPayload.photos = (await Promise.all(uploadPromises)).filter((p): p is string => p !== undefined);
             }
             success = await updateAssetInDb(action.assetId, assetPayload);
+            // Keep IndexedDB cache in sync
+            if (success) {
+              const isProjectCached = await isProjectOffline(action.projectId);
+              if (isProjectCached) {
+                const existingAsset = await db.assets.get(action.assetId);
+                if (existingAsset) {
+                  await db.assets.put({ ...existingAsset, ...assetPayload, isCached: true });
+                }
+              }
+            }
             break;
           }
-          case 'update-folder':
+          case 'update-folder': {
             success = await updateFolderInDb(action.folderId, action.payload);
+            // Keep IndexedDB cache in sync
+            if (success) {
+              const isProjectCached = await isProjectOffline(action.projectId);
+              if (isProjectCached) {
+                const existingFolder = await db.folders.get(action.folderId);
+                if (existingFolder) {
+                  await db.folders.put({ ...existingFolder, ...action.payload, isCached: true });
+                }
+              }
+            }
             break;
-          case 'delete-folder':
+          }
+          case 'delete-folder': {
             success = await deleteFolderInDb(action.folderId);
+            // Keep IndexedDB cache in sync
+            if (success) {
+              const isProjectCached = await isProjectOffline(action.projectId);
+              if (isProjectCached) {
+                await db.folders.delete(action.folderId);
+              }
+            }
             break;
-          case 'delete-asset':
+          }
+          case 'delete-asset': {
             success = await deleteAssetInDb(action.assetId);
+            // Keep IndexedDB cache in sync
+            if (success) {
+              const isProjectCached = await isProjectOffline(action.projectId);
+              if (isProjectCached) {
+                await db.assets.delete(action.assetId);
+              }
+            }
             break;
+          }
         }
       } catch (error) {
         console.error(`Failed to sync action:`, action, 'Error:', error);
       }
-      
+
       if (success) {
         syncedCount++;
       } else {
@@ -180,13 +234,13 @@ export async function syncOfflineActions(): Promise<{syncedCount: number, errorC
         remainingActions.push(action);
       }
     }
-  
+
     saveOfflineQueue(remainingActions);
-    
+
     if(errorCount > 0){
       console.warn(`${errorCount} offline actions failed to sync and were re-queued.`);
     }
-  
+
     return { syncedCount, errorCount };
 }
 
@@ -229,16 +283,46 @@ export async function addProjectOffline(project: Project): Promise<void> {
   await db.projects.put(projectToCache);
 }
 
+/** Remove a project and all its folders/assets from IndexedDB. */
+export async function removeProjectFromCache(projectId: string): Promise<void> {
+  if (typeof window === 'undefined') return;
+  await db.transaction('rw', db.projects, db.folders, db.assets, async () => {
+    await db.projects.delete(projectId);
+    await db.folders.where({ projectId }).delete();
+    await db.assets.where({ projectId }).delete();
+  });
+}
+
+/** Patch specific fields of a cached project without re-downloading everything. */
+export async function updateProjectInCache(projectId: string, data: Partial<Project>): Promise<void> {
+  if (typeof window === 'undefined') return;
+  const existing = await db.projects.get(projectId);
+  if (existing) {
+    await db.projects.put({ ...existing, ...data });
+  }
+}
+
+/** Returns the Set of all project IDs that are currently stored in IndexedDB. */
+export async function getOfflineCachedProjectIds(): Promise<Set<string>> {
+  if (typeof window === 'undefined') return new Set();
+  const projects = await db.projects.toArray();
+  return new Set(projects.map(p => p.id));
+}
+
 export async function getProjectDataFromCache(projectId: string): Promise<{ project: Project | null; folders: Folder[]; assets: Asset[] }> {
   if (typeof window === 'undefined') return { project: null, folders: [], assets: [] };
-  
+
   const [project, folders, assets] = await Promise.all([
     db.projects.get(projectId),
     db.folders.where({ projectId }).toArray(),
     db.assets.where({ projectId }).toArray()
   ]);
 
-  return { project, folders, assets };
+  return { 
+    project: (project as Project) || null, 
+    folders, 
+    assets 
+  };
 }
 
 export async function getDownloadedProjectsFromCache(): Promise<Project[]> {

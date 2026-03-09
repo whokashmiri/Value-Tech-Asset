@@ -14,6 +14,7 @@ import { ProjectDashboard } from '@/components/project-dashboard';
 import { useOnlineStatus } from '@/hooks/use-online-status';
 
 const SELECTED_COMPANY_ID_KEY = 'selectedCompanyId';
+const CACHED_COMPANIES_KEY = 'cachedUserCompanies';
 
 export default function HomePage() {
   const { currentUser, isLoading: authIsLoading, logout: authLogout } = useAuth();
@@ -35,23 +36,30 @@ export default function HomePage() {
         const companyIds = await FirestoreService.getAssociatedCompanyIdsForUser(currentUser.id, currentUser.companyId);
         if (companyIds.length > 0) {
           companies = await FirestoreService.getCompaniesByIds(companyIds);
+          localStorage.setItem(CACHED_COMPANIES_KEY, JSON.stringify(companies));
         }
       } else {
-        // Offline: Try to load companies from cache based on offline projects
-        const offlineProjects = await OfflineService.getDownloadedProjectsFromCache();
-        const offlineCompaniesMap = new Map<string, string>();
-        
-        offlineProjects.forEach(p => {
-            if (!offlineCompaniesMap.has(p.companyId)) {
-                offlineCompaniesMap.set(p.companyId, p.companyName);
+        // Offline: Try to load companies from cache first
+        const cachedCompaniesJson = localStorage.getItem(CACHED_COMPANIES_KEY);
+        if (cachedCompaniesJson) {
+            companies = JSON.parse(cachedCompaniesJson);
+        } else {
+            // Fallback: infer from offline projects
+            const offlineProjects = await OfflineService.getDownloadedProjectsFromCache();
+            const offlineCompaniesMap = new Map<string, string>();
+            
+            offlineProjects.forEach(p => {
+                if (!offlineCompaniesMap.has(p.companyId)) {
+                    offlineCompaniesMap.set(p.companyId, p.companyName);
+                }
+            });
+            
+            if (currentUser.companyId && !offlineCompaniesMap.has(currentUser.companyId)) {
+                offlineCompaniesMap.set(currentUser.companyId, currentUser.companyName);
             }
-        });
-        
-        if (currentUser.companyId && !offlineCompaniesMap.has(currentUser.companyId)) {
-            offlineCompaniesMap.set(currentUser.companyId, currentUser.companyName);
-        }
 
-        companies = Array.from(offlineCompaniesMap.entries()).map(([id, name]) => ({ id, name }));
+            companies = Array.from(offlineCompaniesMap.entries()).map(([id, name]) => ({ id, name }));
+        }
       }
 
       // Sort the companies to ensure the user's primary company is always first.
@@ -63,7 +71,7 @@ export default function HomePage() {
 
       setAssociatedCompanies(companies);
       
-      const storedCompanyId = sessionStorage.getItem(SELECTED_COMPANY_ID_KEY);
+      const storedCompanyId = localStorage.getItem(SELECTED_COMPANY_ID_KEY);
       if (storedCompanyId) {
         const companyFromStorage = companies.find(c => c.id === storedCompanyId);
         if (companyFromStorage) {
@@ -96,11 +104,12 @@ export default function HomePage() {
 
   const handleSelectCompany = (company: Company) => {
     setSelectedCompany(company);
-    sessionStorage.setItem(SELECTED_COMPANY_ID_KEY, company.id);
+    localStorage.setItem(SELECTED_COMPANY_ID_KEY, company.id);
   };
 
   const handleLogoutAndReset = () => {
-    sessionStorage.removeItem(SELECTED_COMPANY_ID_KEY);
+    localStorage.removeItem(SELECTED_COMPANY_ID_KEY);
+    localStorage.removeItem(CACHED_COMPANIES_KEY);
     authLogout();
     setSelectedCompany(null); 
     setAssociatedCompanies(null);
@@ -108,7 +117,7 @@ export default function HomePage() {
   };
 
   const handleSwitchCompany = () => {
-    sessionStorage.removeItem(SELECTED_COMPANY_ID_KEY);
+    localStorage.removeItem(SELECTED_COMPANY_ID_KEY);
     setSelectedCompany(null);
   };
 
