@@ -452,10 +452,10 @@ const CustomCameraDialog: FC<any> = ({
             >
               {captureMode === "photo" ? (
                 <Camera className="w-7 h-7 sm:w-9 sm:h-9 text-black" />
+              ) : isRecording ? (
+                <div className="h-8 w-8 rounded-md bg-white transition-all" />
               ) : (
-                <div
-                  className={`h-8 w-8 rounded-md transition-all ${isRecording ? "bg-white" : "bg-red-500"}`}
-                />
+                <div className="h-8 w-8 rounded-full bg-red-500 transition-all" />
               )}
             </Button>
             <Button
@@ -638,11 +638,28 @@ export function NewAssetModal({
           streamInstance = await navigator.mediaDevices.getUserMedia({
             video: {
               facingMode: "environment",
-              width: { ideal: 8000 },
-              height: { ideal: 6000 },
+              width: { ideal: 1920 },
+              height: { ideal: 1080 },
             },
-            audio: captureMode === "video",
+            audio: false,
           });
+          if (captureMode === "video") {
+            try {
+              const audioStream = await navigator.mediaDevices.getUserMedia({
+                audio: true,
+                video: false,
+              });
+              audioStream
+                .getAudioTracks()
+                .forEach((track) => streamInstance.addTrack(track));
+            } catch (audioErr) {
+              console.warn(
+                "Could not get audio track, proceeding without audio:",
+                audioErr,
+              );
+              // non-fatal — video recording will just have no audio
+            }
+          }
           setMediaStream(streamInstance);
           setHasCameraPermission(true);
           if (videoRef.current) {
