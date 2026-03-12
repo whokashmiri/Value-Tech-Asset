@@ -44,7 +44,8 @@ const nextConfig: NextConfig = {
       'https://9002-firebase-studio-1748928733161.cluster-oayqgyglpfgseqclbygurw4xd4.cloudworkstations.dev',
       'https://*.cloudworkstations.dev',
       'http://localhost:3000',
-      'http://localhost:9002'
+      'http://localhost:9002',
+      'pncxkhkn-3000.uks1.devtunnels.ms',
     ],
   },
 };

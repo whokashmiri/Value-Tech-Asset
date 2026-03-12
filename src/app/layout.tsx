@@ -21,7 +21,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
+      <head suppressHydrationWarning>
         <meta name="application-name" content="ValTech" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -32,14 +32,14 @@ export default function RootLayout({
         <meta name="msapplication-tap-highlight" content="no" />
         <meta name="theme-color" content="#2962FF" />
 
-        <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+        {/* <link rel="apple-touch-icon" href="/icons/icon-192x192.png" /> */}
 
         {/* <link rel="preconnect" href="https://fonts.googleapis.com" /> */}
         {/* <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" /> */}
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-        <link href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;500&display=swap" rel="stylesheet" />
+        {/* <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" /> */}
+        {/* <link href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;500&display=swap" rel="stylesheet" /> */}
       </head>
-      <body className={cn("min-h-screen bg-background font-body antialiased")}>
+      <body className={cn("min-h-screen bg-background font-body antialiased")} suppressHydrationWarning>
         <AuthProvider>
           <LanguageProvider>
             <ClipboardProvider>
