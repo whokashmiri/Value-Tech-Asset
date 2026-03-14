@@ -35,7 +35,9 @@ export default function ProjectPage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const projectId = params.projectId as string;
+  const paramProjectId = params.projectId as string | undefined;
+  const [derivedProjectId, setDerivedProjectId] = useState<string>(() => paramProjectId ?? '');
+  const projectId = derivedProjectId;
   const currentUrlFolderId = searchParams.get('folderId') || null;
   const isOnline = useOnlineStatus();
 
@@ -82,6 +84,23 @@ export default function ProjectPage() {
   const [assetFilter, setAssetFilter] = useState<'active' | 'completed' | 'all'>('active');
   const [isProjectAvailableOffline, setIsProjectAvailableOffline] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+
+  useEffect(() => {
+    if (paramProjectId) {
+      setDerivedProjectId(paramProjectId);
+      return;
+    }
+    if (typeof window === 'undefined') return;
+    const match = window.location.pathname.match(/^\/project\/([^\/?#]+)/);
+    if (match) {
+      try {
+        const decodedId = decodeURIComponent(match[1]);
+        setDerivedProjectId(decodedId);
+      } catch (error) {
+        console.warn("Could not decode offline project ID from URL:", error);
+      }
+    }
+  }, [paramProjectId]);
 
   // State for Drag-and-Drop
   const [isDraggingOver, setIsDraggingOver] = useState(false);
