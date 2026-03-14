@@ -368,7 +368,9 @@ export default function ProjectPage() {
         a => !deletedAssetIds.has(a.id) && !offlineAssetIds.has(a.id)
     );
 
-    // 4. Combine base (Firestore OR IndexedDB) + Offline Queue additions
+
+    // 4. Combine base (Firestore OR IndexedDB) 
+    // + Offline Queue additions
     return {
       finalFoldersToDisplay: [...offlineFoldersForView, ...uniqueBaseFolders],
       finalAssetsToDisplay: [...offlineAssetsForView, ...uniqueBaseAssets],
