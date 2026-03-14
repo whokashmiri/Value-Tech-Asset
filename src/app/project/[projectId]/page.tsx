@@ -826,6 +826,11 @@ export default function ProjectPage() {
     toast({ title: t('downloadingProject', 'Downloading...'), description: t('downloadingProjectDesc', 'Preparing project for offline use...') });
     try {
       await OfflineService.saveProjectForOffline(project.id);
+      try {
+    await fetch(`/project/${project.id}`, { credentials: 'same-origin' });
+    } catch (e) {
+      console.warn('Could not pre-cache project route', e);
+    }
       setIsProjectAvailableOffline(true);
       toast({ title: t('downloadComplete', 'Download Complete'), description: `Project "${project.name}" is now available offline.`, variant: 'success-yellow' });
     } catch (error) {

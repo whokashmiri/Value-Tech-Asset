@@ -7,9 +7,14 @@ const forcePWAInDev = process.env.NEXT_PUBLIC_ENABLE_PWA_IN_DEV === 'true';
 
 const withPWA = withPWAInit({
   dest: 'public',
-  disable: isDevelopment && !forcePWAInDev, // Allow overriding via NEXT_PUBLIC_ENABLE_PWA_IN_DEV
+  disable: isDevelopment && !forcePWAInDev,
   register: true,
   skipWaiting: true,
+  cacheOnFrontEndNav: true,
+  reloadOnOnline: false,
+  fallbacks: {
+    document: '/offline',
+  },
 });
 
 const nextConfig: NextConfig = {

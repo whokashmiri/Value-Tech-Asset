@@ -1,4 +1,4 @@
-
+// auth-context.tsx
 "use client";
 import type { ReactNode } from 'react';
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
@@ -29,25 +29,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
   const router = useRouter();
 
-  useEffect(() => {
-    // Initialize Firebase Auth SDK listener if needed, or handle session persistence
-    const authSDK = getFirebaseAuthSDK(); // Ensures Firebase is initialized
-    // Example: onAuthStateChanged(authSDK, user => { ... });
-    // For now, we'll stick to localStorage for simplicity as per previous setup.
-    try {
-      const storedUserJson = localStorage.getItem(CURRENT_USER_SESSION_KEY);
-      if (storedUserJson) {
-        const storedUser = JSON.parse(storedUserJson) as AuthenticatedUser;
-        setAuthState({ currentUser: storedUser, isLoading: false });
-      } else {
-        setAuthState(prev => ({ ...prev, isLoading: false }));
-      }
-    } catch (error) {
-      console.error("Error reading user session from localStorage:", error);
-      setAuthState(prev => ({ ...prev, isLoading: false }));
-    }
-  }, []);
+  // useEffect(() => {
+  //   // Initialize Firebase Auth SDK listener if needed, or handle session persistence
+  //   const authSDK = getFirebaseAuthSDK(); // Ensures Firebase is initialized
+  //   // Example: onAuthStateChanged(authSDK, user => { ... });
+  //   // For now, we'll stick to localStorage for simplicity as per previous setup.
+  //   try {
+  //     const storedUserJson = localStorage.getItem(CURRENT_USER_SESSION_KEY);
+  //     if (storedUserJson) {
+  //       const storedUser = JSON.parse(storedUserJson) as AuthenticatedUser;
+  //       setAuthState({ currentUser: storedUser, isLoading: false });
+  //     } else {
+  //       setAuthState(prev => ({ ...prev, isLoading: false }));
+  //     }
+  //   } catch (error) {
+  //     console.error("Error reading user session from localStorage:", error);
+  //     setAuthState(prev => ({ ...prev, isLoading: false }));
+  //   }
+  // }, []);
 
+
+
+
+  useEffect(() => {
+  try {
+    const storedUserJson = localStorage.getItem(CURRENT_USER_SESSION_KEY);
+    if (storedUserJson) {
+      const storedUser = JSON.parse(storedUserJson) as AuthenticatedUser;
+      setAuthState({ currentUser: storedUser, isLoading: false });
+    } else {
+      setAuthState({ currentUser: null, isLoading: false });
+    }
+  } catch (error) {
+    console.error("Error reading user session from localStorage:", error);
+    setAuthState({ currentUser: null, isLoading: false });
+  }
+}, []);
   const login = useCallback(async (email: string, passwordInput?: string): Promise<{ success: boolean; message?: string }> => {
     setAuthState(prev => ({ ...prev, isLoading: true }));
     try {
