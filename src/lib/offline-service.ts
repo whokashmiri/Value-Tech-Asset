@@ -12,7 +12,6 @@ import {
   deleteFolderCascade as deleteFolderInDb,
   deleteAsset as deleteAssetInDb,
 } from './firestore-service';
-import { uploadMedia } from '@/actions/cloudinary-actions';
 import type { Folder, Asset, Project, ProjectStatus } from '@/data/mock-data';
 import { v4 as uuidv4 } from 'uuid';
 import Dexie, { type EntityTable } from 'dexie';
@@ -143,8 +142,12 @@ export async function syncOfflineActions(): Promise<{syncedCount: number, errorC
             if (assetPayload.photos && assetPayload.photos.length > 0) {
                 const uploadPromises = assetPayload.photos.map(async (p: string, index: number) => {
                     if (p.startsWith('data:image')) {
-                        const result = await uploadMedia(p, action.projectId, action.localId || `asset-${index}`);
-                        return result.success ? result.url : p;
+                        const uploadedUrl = await uploadMediaViaApi(
+                            p,
+                            action.projectId,
+                            action.localId || `asset-${index}`
+                        );
+                        return uploadedUrl ?? p;
                     }
                     return p;
                 });
@@ -166,8 +169,12 @@ export async function syncOfflineActions(): Promise<{syncedCount: number, errorC
             if (assetPayload.photos && assetPayload.photos.length > 0) {
                 const uploadPromises = assetPayload.photos.map(async (p: string, index: number) => {
                     if (p.startsWith('data:image')) {
-                        const result = await uploadMedia(p, action.projectId, action.assetId || `asset-${index}`);
-                        return result.success ? result.url : p;
+                        const uploadedUrl = await uploadMediaViaApi(
+                            p,
+                            action.projectId,
+                            action.assetId || `asset-${index}`
+                        );
+                        return uploadedUrl ?? p;
                     }
                     return p;
                 });
@@ -362,4 +369,35 @@ export async function searchAssetsInCache(projectId: string, searchTerm: string)
         console.error("Error searching assets in cache: ", error);
         return [];
     }
+}
+
+const API_UPLOAD_MEDIA_ENDPOINT = '/api/upload-media';
+
+async function uploadMediaViaApi(
+  fileDataUrl: string,
+  projectId: string,
+  assetId: string
+): Promise<string | null> {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const response = await fetch(API_UPLOAD_MEDIA_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ fileDataUrl, projectId, assetId }),
+    });
+    const payload = await response.json();
+
+    if (response.ok && payload?.success && typeof payload.url === 'string') {
+      return payload.url;
+    }
+
+    console.error('Offline upload via API failed', payload?.error || response.status);
+    return null;
+  } catch (error) {
+    console.error('Failed to upload media using API route:', error);
+    return null;
+  }
 }
